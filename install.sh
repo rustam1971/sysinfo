@@ -118,7 +118,7 @@ success "Log directory: ${LOG_DIR}"
 # -----------------------------------------------
 info "Memeriksa cronjob monitoring..."
 
-if crontab -l 2>/dev/null | grep -qF "sysinfo.sh" | grep -v "sysinfo_new"; then
+if crontab -l 2>/dev/null | grep -v "sysinfo_new" | grep -qF "sysinfo.sh"; then
     warn "Cronjob monitoring sudah ada, dilewati."
 else
     ( crontab -l 2>/dev/null; echo "${CRON_MONITOR}" ) | crontab -
