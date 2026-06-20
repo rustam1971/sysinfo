@@ -52,6 +52,14 @@ TMP_DIR="/tmp/sysinfo_$$"
 VERBOSE=false
 [[ "${1:-}" == "-v" ]] && VERBOSE=true
 
+# -----------------------------------------------
+# Telegram konfigurasi
+# -----------------------------------------------
+BOT_TOKEN="8404805798:AAGiWDCzFYplZhqGqHffZVzNJDAwzgn1nzM"
+CHAT_ID="5352422283"
+CPU_THRESHOLD=80
+FLAG_CPU="/tmp/sysinfo_alert_cpu"
+
 mkdir -p "${LOG_DIR}" "${TMP_DIR}"
 trap "rm -rf ${TMP_DIR}" EXIT
 
@@ -102,6 +110,63 @@ print_footer() { $VERBOSE && echo; }
 
 get_field() {
     hostnamectl 2>/dev/null | grep -i "^ *$1" | head -1 | sed 's/^[^:]*: *//'
+}
+
+# -----------------------------------------------
+# Telegram alert
+# -----------------------------------------------
+send_telegram() {
+    local msg="$1"
+    curl -s -X POST \
+        "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+        -d chat_id="${CHAT_ID}" \
+        -d parse_mode="HTML" \
+        -d text="$msg" &>/dev/null
+}
+
+get_main_ip() {
+    local iface
+    iface=$(ip route show default 2>/dev/null | awk '/default/{print $5}' | head -1)
+    ip -4 addr show "$iface" 2>/dev/null \
+        | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1
+}
+
+get_top_cpu_short() {
+    ps -eo pcpu,comm --sort=-%cpu --no-headers 2>/dev/null \
+        | head -3 \
+        | awk '{printf "%s %s%%", $2, $1; if(NR<3) printf " | "}'
+}
+
+check_cpu_alert() {
+    local cpu=$1 cores=$2 load=$3
+    local host ip top_cpu now
+
+    host=$(hostname -f 2>/dev/null || hostname)
+    ip=$(get_main_ip)
+    top_cpu=$(get_top_cpu_short)
+    now=$(date '+%Y-%m-%d %H:%M:%S')
+
+    if [[ "$cpu" -ge "$CPU_THRESHOLD" ]]; then
+        if [[ ! -f "$FLAG_CPU" ]]; then
+            touch "$FLAG_CPU"
+            send_telegram "🔴 <b>[ALERT] CPU Usage Tinggi</b>
+Host    : ${host}
+IP      : ${ip:-N/A}
+CPU     : ${cpu}% of ${cores} CPU(s)
+Load    : ${load}
+Top CPU : ${top_cpu}
+Time    : ${now}"
+        fi
+    else
+        if [[ -f "$FLAG_CPU" ]]; then
+            rm -f "$FLAG_CPU"
+            send_telegram "✅ <b>[RECOVERY] CPU Normal</b>
+Host    : ${host}
+IP      : ${ip:-N/A}
+CPU     : ${cpu}% of ${cores} CPU(s)
+Time    : ${now}"
+        fi
+    fi
 }
 
 # -----------------------------------------------
@@ -426,7 +491,6 @@ log_services() {
     log "Services total   : ${tr} running of ${ta}" "Services total :" "${tr} running of ${ta}"
     for svc in "${MONITOR_SERVICES[@]}"; do
         local st check_svc="$svc"
-        # Auto-detect ssh vs ssh.socket
         if [[ "$svc" == "ssh" ]]; then
             if ! systemctl is-active ssh &>/dev/null; then
                 if systemctl is-active ssh.socket &>/dev/null; then
@@ -505,6 +569,13 @@ BOOT_ID=$(get_field "Boot ID");    VIRT=$(get_field "Virtualization")
 OS=$(get_field "Operating System"); KERNEL=$(get_field "Kernel")
 ARCH=$(get_field "Architecture");  HW_VENDOR=$(get_field "Hardware Vendor")
 HW_MODEL=$(get_field "Hardware Model")
+
+# -----------------------------------------------
+# Cek CPU alert (hanya saat cron, bukan verbose)
+# -----------------------------------------------
+if ! $VERBOSE; then
+    check_cpu_alert "$CPU_USAGE" "$CPU_CORES" "$LOAD_AVG"
+fi
 
 # -----------------------------------------------
 # Output
