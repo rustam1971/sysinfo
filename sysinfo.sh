@@ -6,7 +6,7 @@
 # Supported: Ubuntu 20.04+ / Debian 10+
 
 # -----------------------------------------------
-# Cek kompatibilitas OS — harus jalan sebelum apapun
+# Cek kompatibilitas OS
 # -----------------------------------------------
 if [[ ! -f /etc/os-release ]]; then
     echo "ERROR: Tidak dapat mendeteksi OS. Script ini hanya mendukung Ubuntu/Debian."
@@ -15,7 +15,6 @@ fi
 
 source /etc/os-release
 
-# Cek apakah distro berbasis Debian
 case "${ID,,}" in
     ubuntu|debian) ;;
     *)
@@ -26,21 +25,18 @@ case "${ID,,}" in
         ;;
 esac
 
-# Cek versi minimum
 _ver_major=$(echo "${VERSION_ID}" | cut -d'.' -f1)
 
-if [[ "${ID,,}" == "ubuntu" ]]; then
-    if [[ -n "$_ver_major" && "$_ver_major" -lt 20 ]]; then
-        echo "ERROR: Ubuntu ${VERSION_ID} tidak didukung."
-        echo "       Script ini membutuhkan Ubuntu 20.04 atau lebih baru."
-        exit 1
-    fi
-elif [[ "${ID,,}" == "debian" ]]; then
-    if [[ -n "$_ver_major" && "$_ver_major" -lt 10 ]]; then
-        echo "ERROR: Debian ${VERSION_ID} tidak didukung."
-        echo "       Script ini membutuhkan Debian 10 (Buster) atau lebih baru."
-        exit 1
-    fi
+if [[ "${ID,,}" == "ubuntu" && -n "$_ver_major" && "$_ver_major" -lt 20 ]]; then
+    echo "ERROR: Ubuntu ${VERSION_ID} tidak didukung."
+    echo "       Script ini membutuhkan Ubuntu 20.04 atau lebih baru."
+    exit 1
+fi
+
+if [[ "${ID,,}" == "debian" && -n "$_ver_major" && "$_ver_major" -lt 10 ]]; then
+    echo "ERROR: Debian ${VERSION_ID} tidak didukung."
+    echo "       Script ini membutuhkan Debian 10 (Buster) atau lebih baru."
+    exit 1
 fi
 
 # -----------------------------------------------
@@ -427,12 +423,23 @@ log_services() {
     ta=$(systemctl list-units --type=service --no-legend 2>/dev/null | wc -l)
     log "Services total   : ${tr} running of ${ta}" "Services total :" "${tr} running of ${ta}"
     for svc in "${MONITOR_SERVICES[@]}"; do
-        local st; st=$(systemctl is-active "${svc}" 2>/dev/null)
+        local st check_svc="$svc"
+        # Auto-detect ssh vs ssh.socket
+        if [[ "$svc" == "ssh" ]]; then
+            if ! systemctl is-active ssh &>/dev/null; then
+                if systemctl is-active ssh.socket &>/dev/null; then
+                    check_svc="ssh.socket"
+                fi
+            fi
+        fi
+        st=$(systemctl is-active "${check_svc}" 2>/dev/null)
         [[ -z "$st" ]] && st="not-found"
         if $VERBOSE; then
-            [[ "$st" == "active" ]] \
-                && printf "${CYAN}%-22s${RESET}${GREEN}%s${RESET}\n" "Service ${svc} :" "$st" \
-                || printf "${CYAN}%-22s${RESET}${RED}%s${RESET}\n"   "Service ${svc} :" "$st"
+            if [[ "$st" == "active" ]]; then
+                printf "${CYAN}%-22s${RESET}${GREEN}%s${RESET}\n" "Service ${svc} :" "$st"
+            else
+                printf "${CYAN}%-22s${RESET}${RED}%s${RESET}\n"   "Service ${svc} :" "$st"
+            fi
         else
             echo "$(date '+%H:%M:%S') | Service ${svc}       : ${st}" >> "${LOG_FILE}"
         fi
