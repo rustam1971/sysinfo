@@ -1,6 +1,6 @@
 #!/bin/bash
 # install.sh — installer untuk sysinfo.sh
-# Usage: wget -qO- https://raw.githubusercontent.com/USERNAME/REPO/main/install.sh | bash
+# Usage: wget -qO- https://raw.githubusercontent.com/rustam1971/sysinfo/main/install.sh | bash
 
 GITHUB_RAW="https://raw.githubusercontent.com/rustam1971/sysinfo/main"
 SCRIPT_URL="${GITHUB_RAW}/sysinfo.sh"
