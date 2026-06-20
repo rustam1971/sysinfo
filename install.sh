@@ -2,7 +2,7 @@
 # install.sh — installer untuk sysinfo.sh
 # Usage: wget -qO- https://raw.githubusercontent.com/USERNAME/REPO/main/install.sh | bash
 
-GITHUB_RAW="https://raw.githubusercontent.com/USERNAME/REPO/main"
+GITHUB_RAW="https://raw.githubusercontent.com/rustam1971/sysinfo/main"
 SCRIPT_URL="${GITHUB_RAW}/sysinfo.sh"
 INSTALL_PATH="/usr/local/bin/sysinfo.sh"
 CRON_JOB="2-57/5 * * * * nice -n 19 /usr/local/bin/sysinfo.sh"
@@ -15,7 +15,6 @@ YELLOW='\033[0;33m'; RESET='\033[0m'
 info()    { echo -e "${GREEN}[INFO]${RESET}  $1"; }
 warn()    { echo -e "${YELLOW}[WARN]${RESET}  $1"; }
 error()   { echo -e "${RED}[ERROR]${RESET} $1"; }
-success() { echo -e "${GREEN}[OK]${RESET}    $1"; }
 
 echo ""
 echo "================================================"
