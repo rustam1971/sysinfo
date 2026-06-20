@@ -286,13 +286,15 @@ get_firewall_status() {
         st=$(ufw status 2>/dev/null | grep -i "^Status:" | awk '{print tolower($2)}')
         if [[ "$st" == "active" ]]; then
             rules=$(ufw status 2>/dev/null | grep -c "ALLOW\|DENY\|REJECT" || echo 0)
+            rules=$(echo "$rules" | tr -d '[:space:]')
             echo "active (${rules} rules)"
         else
             echo "${st:-inactive}"
         fi
     elif command -v iptables &>/dev/null; then
         local rules
-        rules=$(iptables -L 2>/dev/null | grep -c "^ACCEPT\|^DROP\|^REJECT" || echo 0)
+        rules=$(iptables -L 2>/dev/null \
+            | grep -E "^(ACCEPT|DROP|REJECT)" | wc -l | tr -d '[:space:]')
         echo "iptables (${rules} rules)"
     else
         echo "not installed"
