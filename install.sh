@@ -1,11 +1,12 @@
 #!/bin/bash
 # install.sh — installer untuk sysinfo.sh
-# Usage: wget -qO- https://raw.githubusercontent.com/rustam1971/sysinfo/main/install.sh | bash
+# Usage: wget -qO /tmp/install.sh https://raw.githubusercontent.com/rustam1971/sysinfo/main/install.sh && bash /tmp/install.sh
 
 GITHUB_RAW="https://raw.githubusercontent.com/rustam1971/sysinfo/main"
 SCRIPT_URL="${GITHUB_RAW}/sysinfo.sh"
 INSTALL_PATH="/usr/local/bin/sysinfo.sh"
-CRON_JOB="2-57/5 * * * * nice -n 19 /usr/local/bin/sysinfo.sh"
+CRON_MONITOR="2-57/5 * * * * nice -n 19 /usr/local/bin/sysinfo.sh"
+CRON_UPDATE="0 3 * * * wget -qO /tmp/sysinfo_new.sh ${GITHUB_RAW}/sysinfo.sh && if ! diff -q /tmp/sysinfo_new.sh ${INSTALL_PATH} &>/dev/null; then mv /tmp/sysinfo_new.sh ${INSTALL_PATH} && chmod +x ${INSTALL_PATH}; else rm -f /tmp/sysinfo_new.sh; fi"
 LOG_DIR="/var/log/sysinfo"
 
 # Warna
@@ -92,12 +93,10 @@ info "Mengunduh sysinfo.sh dari GitHub..."
 if ! wget -qO "${INSTALL_PATH}.tmp" "${SCRIPT_URL}"; then
     error "Gagal mengunduh sysinfo.sh dari:"
     echo "       ${SCRIPT_URL}"
-    echo "       Periksa koneksi internet atau URL."
     rm -f "${INSTALL_PATH}.tmp"
     exit 1
 fi
 
-# Validasi — pastikan bukan halaman error HTML
 if grep -q "<!DOCTYPE html>" "${INSTALL_PATH}.tmp" 2>/dev/null; then
     error "URL tidak valid atau file tidak ditemukan di GitHub."
     rm -f "${INSTALL_PATH}.tmp"
@@ -115,15 +114,27 @@ mkdir -p "${LOG_DIR}"
 success "Log directory: ${LOG_DIR}"
 
 # -----------------------------------------------
-# Setup cronjob
+# Setup cronjob monitoring
 # -----------------------------------------------
-info "Memeriksa cronjob..."
+info "Memeriksa cronjob monitoring..."
 
-if crontab -l 2>/dev/null | grep -qF "sysinfo.sh"; then
-    warn "Cronjob sudah ada, dilewati."
+if crontab -l 2>/dev/null | grep -qF "sysinfo.sh" | grep -v "sysinfo_new"; then
+    warn "Cronjob monitoring sudah ada, dilewati."
 else
-    ( crontab -l 2>/dev/null; echo "${CRON_JOB}" ) | crontab -
-    success "Cronjob ditambahkan: ${CRON_JOB}"
+    ( crontab -l 2>/dev/null; echo "${CRON_MONITOR}" ) | crontab -
+    success "Cronjob monitoring ditambahkan: setiap 5 menit"
+fi
+
+# -----------------------------------------------
+# Setup cronjob auto-update harian
+# -----------------------------------------------
+info "Memeriksa cronjob auto-update..."
+
+if crontab -l 2>/dev/null | grep -qF "sysinfo_new.sh"; then
+    warn "Cronjob auto-update sudah ada, dilewati."
+else
+    ( crontab -l 2>/dev/null; echo "${CRON_UPDATE}" ) | crontab -
+    success "Cronjob auto-update ditambahkan: setiap hari jam 03:00"
 fi
 
 # -----------------------------------------------
@@ -147,11 +158,13 @@ echo ""
 echo "================================================"
 success "Instalasi selesai!"
 echo ""
-echo "  Script  : ${INSTALL_PATH}"
-echo "  Log dir : ${LOG_DIR}"
-echo "  Crontab : ${CRON_JOB}"
+echo "  Script     : ${INSTALL_PATH}"
+echo "  Log dir    : ${LOG_DIR}"
+echo "  Monitoring : ${CRON_MONITOR}"
+echo "  Auto-update: setiap hari jam 03:00"
 echo ""
 echo "  Jalankan manual : sysinfo.sh -v"
 echo "  Lihat log       : tail -f ${LOG_DIR}/sysinfo-$(date +%Y-%m-%d).log"
+echo "  Cek crontab     : crontab -l"
 echo "================================================"
 echo ""
