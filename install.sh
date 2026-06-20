@@ -114,28 +114,22 @@ mkdir -p "${LOG_DIR}"
 success "Log directory: ${LOG_DIR}"
 
 # -----------------------------------------------
-# Setup cronjob monitoring
+# Setup cronjob — hapus lama, tambah baru
 # -----------------------------------------------
-info "Memeriksa cronjob monitoring..."
+info "Mengatur cronjob..."
 
-if crontab -l 2>/dev/null | grep -v "sysinfo_new" | grep -qF "sysinfo.sh"; then
-    warn "Cronjob monitoring sudah ada, dilewati."
-else
-    ( crontab -l 2>/dev/null; echo "${CRON_MONITOR}" ) | crontab -
-    success "Cronjob monitoring ditambahkan: setiap 5 menit"
-fi
+# Bersihkan semua cronjob sysinfo yang lama
+( crontab -l 2>/dev/null | grep -v "sysinfo" ) | crontab -
 
-# -----------------------------------------------
-# Setup cronjob auto-update harian
-# -----------------------------------------------
-info "Memeriksa cronjob auto-update..."
+# Tambah cronjob monitoring dan auto-update
+(
+    crontab -l 2>/dev/null
+    echo "${CRON_MONITOR}"
+    echo "${CRON_UPDATE}"
+) | crontab -
 
-if crontab -l 2>/dev/null | grep -qF "sysinfo_new.sh"; then
-    warn "Cronjob auto-update sudah ada, dilewati."
-else
-    ( crontab -l 2>/dev/null; echo "${CRON_UPDATE}" ) | crontab -
-    success "Cronjob auto-update ditambahkan: setiap hari jam 03:00"
-fi
+success "Cronjob monitoring : setiap 5 menit"
+success "Cronjob auto-update: setiap hari jam 03:00"
 
 # -----------------------------------------------
 # Test run
